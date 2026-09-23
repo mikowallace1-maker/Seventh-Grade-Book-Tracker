@@ -1,0 +1,1194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>7th Grade Book Tracker - Cloud Edition</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Firebase Compat SDKs for simple single-file deployment -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#0369a1',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; }
+        .glass-panel { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(12px); }
+        @media print {
+            body * { visibility: hidden; }
+            #printable-area, #printable-area * { visibility: visible; }
+            #printable-area { position: absolute; left: 0; top: 0; width: 100%; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+    <!-- Top Navigation Header -->
+    <header class="bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white shadow-lg sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+            <div class="flex items-center gap-3">
+                <div class="bg-white/20 p-2 rounded-xl text-xl"><i class="fa-solid fa-book-open"></i></div>
+                <div>
+                    <h1 class="text-xl font-extrabold tracking-tight">7th Grade Book Tracker</h1>
+                    <div class="flex items-center gap-2 text-xs text-blue-200">
+                        <span id="cloud-status-badge" class="inline-flex items-center gap-1 bg-yellow-500/20 text-yellow-200 px-2 py-0.5 rounded-full font-medium">
+                            <i class="fa-solid fa-circle text-[8px] animate-pulse"></i> Initializing...
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Global Action Controls -->
+            <div class="flex items-center gap-2">
+                <button onclick="openConfigModal()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-cloud-bolt"></i> <span class="hidden sm:inline">Firebase Sync</span>
+                </button>
+                <div id="user-badge" class="hidden bg-white/20 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2">
+                    <i class="fa-solid fa-user-circle"></i> <span id="user-display-name">Student</span>
+                    <button onclick="logout()" class="text-xs text-red-200 hover:text-white underline ml-1">Logout</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation Tabs -->
+        <nav class="bg-black/20 backdrop-blur-sm border-t border-white/10 px-4">
+            <div class="max-w-7xl mx-auto flex overflow-x-auto gap-1 text-sm font-semibold py-1">
+                <button onclick="switchTab('feed')" id="tab-feed" class="px-4 py-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition whitespace-nowrap flex items-center gap-2 active-tab">
+                    <i class="fa-solid fa-newspaper"></i> Activity Feed
+                </button>
+                <button onclick="switchTab('leaderboard')" id="tab-leaderboard" class="px-4 py-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition whitespace-nowrap flex items-center gap-2">
+                    <i class="fa-solid fa-trophy"></i> Leaderboards
+                </button>
+                <button onclick="switchTab('impact')" id="tab-impact" class="px-4 py-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition whitespace-nowrap flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line"></i> Grade Impact
+                </button>
+                <button onclick="switchTab('submit')" id="tab-submit" class="px-4 py-2 rounded-lg text-white/80 hover:text-white hover:bg-white/10 transition whitespace-nowrap flex items-center gap-2">
+                    <i class="fa-solid fa-plus-circle text-green-300"></i> Log a Book
+                </button>
+                <button onclick="switchTab('teacher')" id="tab-teacher" class="px-4 py-2 rounded-lg text-amber-300 hover:text-white hover:bg-white/10 transition whitespace-nowrap flex items-center gap-2 ml-auto">
+                    <i class="fa-solid fa-lock"></i> Teacher Portal
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+
+        <!-- Banner for setup notification if demo mode -->
+        <div id="demo-mode-alert" class="hidden mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 flex items-center justify-between gap-4 shadow-sm">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-triangle-exclamation text-xl text-amber-600"></i>
+                <div class="text-sm">
+                    <strong>Demo Local Storage Mode Active:</strong> Books logged on this screen won't sync to other devices yet.
+                    <span class="hidden sm:inline">Connect a free Firebase Database to sync grade-wide across all student Chromebooks!</span>
+                </div>
+            </div>
+            <button onclick="openConfigModal()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap transition">
+                Setup Live Cloud Sync
+            </button>
+        </div>
+
+        <!-- ==================== LOGIN PORTAL TAB ==================== -->
+        <section id="view-login" class="max-w-md mx-auto my-8 bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
+            <div class="text-center mb-6">
+                <div class="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl font-black">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                </div>
+                <h2 class="text-2xl font-extrabold text-slate-800">Student Sign In</h2>
+                <p class="text-xs text-slate-500 mt-1">Select your core and name to unlock your reading log.</p>
+            </div>
+
+            <form id="login-form" onsubmit="handleStudentLogin(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">1. Select Core Class</label>
+                    <select id="login-core" onchange="updateStudentDropdown()" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <option value="">-- Choose Core --</option>
+                        <option value="Core 1-ADV">Core 1 - Advanced</option>
+                        <option value="Core 2-REG">Core 2 - Regular</option>
+                        <option value="Core 3-REG">Core 3 - Regular</option>
+                        <option value="Core 4-REG">Core 4 - Regular</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">2. Select Your Name</label>
+                    <select id="login-student" required disabled class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-slate-700 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50">
+                        <option value="">-- Select Core First --</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">3. Enter 4-Digit PIN</label>
+                    <input type="password" id="login-pin" maxlength="4" placeholder="••••" required pattern="[0-9]{4}" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-center text-2xl tracking-widest font-mono focus:outline-none focus:ring-2 focus:ring-blue-500">
+                </div>
+
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-blue-500/20 transition duration-150 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-right-to-bracket"></i> Sign In to Reader Log
+                </button>
+            </form>
+            <div class="mt-6 text-center text-xs text-slate-400">
+                Are you a teacher? <button onclick="switchTab('teacher')" class="text-blue-600 font-semibold underline">Access Teacher Portal</button>
+            </div>
+        </section>
+
+        <!-- ==================== ACTIVITY FEED TAB ==================== -->
+        <section id="view-feed" class="space-y-6 hidden">
+            <!-- Hero Stats Bar -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="bg-gradient-to-br from-blue-500 to-indigo-600 text-white p-5 rounded-2xl shadow-md">
+                    <div class="text-xs uppercase tracking-wider opacity-80 font-bold">Total Books Read</div>
+                    <div id="stat-grade-books" class="text-3xl font-black mt-1">0</div>
+                    <div class="text-xs opacity-75 mt-1"><i class="fa-solid fa-book"></i> Grade-Wide Total</div>
+                </div>
+                <div class="bg-gradient-to-br from-purple-500 to-pink-600 text-white p-5 rounded-2xl shadow-md">
+                    <div class="text-xs uppercase tracking-wider opacity-80 font-bold">Total Pages Read</div>
+                    <div id="stat-grade-pages" class="text-3xl font-black mt-1">0</div>
+                    <div class="text-xs opacity-75 mt-1"><i class="fa-solid fa-file-lines"></i> Cumulative Pages</div>
+                </div>
+                <div class="bg-gradient-to-br from-amber-500 to-orange-600 text-white p-5 rounded-2xl shadow-md">
+                    <div class="text-xs uppercase tracking-wider opacity-80 font-bold">Leading Core</div>
+                    <div id="stat-leading-core" class="text-2xl font-black mt-1 truncate">Core 1-ADV</div>
+                    <div class="text-xs opacity-75 mt-1"><i class="fa-solid fa-trophy"></i> Most Books Read</div>
+                </div>
+                <div class="bg-gradient-to-br from-emerald-500 to-teal-600 text-white p-5 rounded-2xl shadow-md">
+                    <div class="text-xs uppercase tracking-wider opacity-80 font-bold">Top Genre</div>
+                    <div id="stat-top-genre" class="text-2xl font-black mt-1 truncate">Fiction</div>
+                    <div class="text-xs opacity-75 mt-1"><i class="fa-solid fa-bookmark"></i> Favorite Category</div>
+                </div>
+            </div>
+
+            <!-- Spotlight Section -->
+            <div id="spotlight-container" class="hidden bg-gradient-to-r from-amber-500/10 via-amber-400/5 to-amber-500/10 border-2 border-amber-400/30 rounded-2xl p-6 relative overflow-hidden">
+                <div class="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-black uppercase px-3 py-1 rounded-bl-xl tracking-widest shadow-sm">
+                    <i class="fa-solid fa-thumbtack"></i> Teacher Spotlight Pick
+                </div>
+                <div id="spotlight-content" class="flex flex-col md:flex-row gap-4 items-start">
+                    <!-- Dynamic Spotlight content injected here -->
+                </div>
+            </div>
+
+            <!-- Main Feed Layout -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Book Activity Stream -->
+                <div class="lg:col-span-2 space-y-4">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <i class="fa-solid fa-rss text-blue-600"></i> Recent Reader Logs
+                        </h2>
+                        <select id="feed-filter-core" onchange="renderFeed()" class="bg-white border border-slate-200 text-xs font-bold rounded-lg px-3 py-1.5 focus:outline-none">
+                            <option value="ALL">All Cores</option>
+                            <option value="Core 1-ADV">Core 1-ADV</option>
+                            <option value="Core 2-REG">Core 2-REG</option>
+                            <option value="Core 3-REG">Core 3-REG</option>
+                            <option value="Core 4-REG">Core 4-REG</option>
+                        </select>
+                    </div>
+
+                    <div id="feed-list" class="space-y-4">
+                        <!-- Dynamic Feed Items Injected Here -->
+                    </div>
+                </div>
+
+                <!-- Sidebar Rules & Milestones -->
+                <div class="space-y-6">
+                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm">
+                        <h3 class="font-bold text-slate-800 flex items-center gap-2 mb-3">
+                            <i class="fa-solid fa-award text-amber-500"></i> Grade Milestones
+                        </h3>
+                        <div class="space-y-3" id="milestone-list">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+
+                    <div class="bg-blue-50 border border-blue-100 rounded-2xl p-5 text-xs text-blue-800 space-y-2">
+                        <h4 class="font-bold text-sm text-blue-900 flex items-center gap-1.5">
+                            <i class="fa-solid fa-circle-info"></i> How It Works
+                        </h4>
+                        <p>1. Finish any book and submit your review via the <strong>Log a Book</strong> tab.</p>
+                        <p>2. Earn digital stickers from your ELA teacher for thoughtful reviews!</p>
+                        <p>3. Watch your Core climb the live leaderboard!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== LEADERBOARDS TAB ==================== -->
+        <section id="view-leaderboard" class="space-y-8 hidden">
+            <!-- Core Competition Standings -->
+            <div>
+                <div class="mb-4">
+                    <h2 class="text-2xl font-extrabold text-slate-800">Core Class Standings</h2>
+                    <p class="text-xs text-slate-500">Friendly core vs core competition for the 7th Grade Cup!</p>
+                </div>
+
+                <div id="core-leaderboard-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- Injected dynamically -->
+                </div>
+            </div>
+
+            <!-- Top Readers Standings -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+                <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800">Top Individual Readers</h3>
+                        <p class="text-xs text-slate-500">Recognizing students with the most total pages & books read</p>
+                    </div>
+                    <select id="leaderboard-core-filter" onchange="renderLeaderboards()" class="bg-slate-50 border border-slate-200 text-xs font-bold rounded-xl px-4 py-2">
+                        <option value="ALL">Show All Cores</option>
+                        <option value="Core 1-ADV">Core 1-ADV</option>
+                        <option value="Core 2-REG">Core 2-REG</option>
+                        <option value="Core 3-REG">Core 3-REG</option>
+                        <option value="Core 4-REG">Core 4-REG</option>
+                    </select>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-slate-100 text-xs font-bold text-slate-400 uppercase tracking-wider">
+                                <th class="pb-3 px-4">Rank</th>
+                                <th class="pb-3 px-4">Student</th>
+                                <th class="pb-3 px-4">Core Class</th>
+                                <th class="pb-3 px-4 text-center">Books Read</th>
+                                <th class="pb-3 px-4 text-center">Pages Read</th>
+                                <th class="pb-3 px-4 text-right">Badge Tier</th>
+                            </tr>
+                        </thead>
+                        <tbody id="student-leaderboard-tbody" class="divide-y divide-slate-100 text-sm font-semibold">
+                            <!-- Injected dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== GRADE IMPACT TAB ==================== -->
+        <section id="view-impact" class="space-y-6 hidden">
+            <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
+                <h2 class="text-2xl font-extrabold text-slate-800 mb-2">Grade-Wide Reading Analytics</h2>
+                <p class="text-xs text-slate-500 mb-6">A high-level summary of our 7th Grade reading engagement this year.</p>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                        <div class="text-xs font-bold text-slate-400 uppercase">Average Pages Per Student</div>
+                        <div id="impact-avg-pages" class="text-3xl font-black text-slate-800 mt-1">0</div>
+                    </div>
+                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                        <div class="text-xs font-bold text-slate-400 uppercase">Verified Entry Rate</div>
+                        <div id="impact-verified-rate" class="text-3xl font-black text-emerald-600 mt-1">0%</div>
+                    </div>
+                    <div class="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                        <div class="text-xs font-bold text-slate-400 uppercase">Stickers Awarded</div>
+                        <div id="impact-stickers-count" class="text-3xl font-black text-purple-600 mt-1">0</div>
+                    </div>
+                </div>
+
+                <h3 class="font-bold text-slate-800 text-lg mb-4">Genre Popularity Breakdown</h3>
+                <div id="genre-distribution-bars" class="space-y-3">
+                    <!-- Injected dynamically -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== SUBMIT BOOK TAB ==================== -->
+        <section id="view-submit" class="max-w-2xl mx-auto hidden">
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-xl p-6 md:p-8">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-extrabold text-slate-800">Log a Finished Book</h2>
+                    <p class="text-xs text-slate-500 mt-1">Fill out the details below to add to your reading log and score points for your Core!</p>
+                </div>
+
+                <form id="book-entry-form" onsubmit="handleBookSubmit(event)" class="space-y-5">
+                    <div id="logged-in-as-banner" class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-900 font-bold flex justify-between items-center">
+                        <span>Logging as: <strong id="submit-author-name">Guest Student</strong></span>
+                        <span id="submit-author-core" class="bg-blue-200 text-blue-800 px-2 py-0.5 rounded-md">Core 1-ADV</span>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="md:col-span-2">
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Book Title *</label>
+                            <input type="text" id="book-title" required placeholder="e.g. The Giver, Percy Jackson" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Author *</label>
+                            <input type="text" id="book-author" required placeholder="Author's Name" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Number of Pages *</label>
+                            <input type="number" id="book-pages" required min="1" max="3000" placeholder="e.g. 240" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Genre *</label>
+                            <select id="book-genre" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">Select Genre</option>
+                                <option value="Fiction">Fiction</option>
+                                <option value="Non-Fiction">Non-Fiction</option>
+                                <option value="Fantasy">Fantasy</option>
+                                <option value="Sci-Fi">Sci-Fi</option>
+                                <option value="Graphic Novel">Graphic Novel</option>
+                                <option value="Mystery">Mystery</option>
+                                <option value="Historical Fiction">Historical Fiction</option>
+                                <option value="Biography">Biography</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Star Rating *</label>
+                            <select id="book-rating" required class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="5">⭐⭐⭐⭐⭐ (5/5 - Loved it!)</option>
+                                <option value="4">⭐⭐⭐⭐ (4/5 - Really Good)</option>
+                                <option value="3">⭐⭐⭐ (3/5 - It was OK)</option>
+                                <option value="2">⭐⭐ (2/5 - Didn't like it)</option>
+                                <option value="1">⭐ (1/5 - Would not recommend)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Brief Review / Key Takeaway *</label>
+                        <textarea id="book-review" required rows="3" placeholder="What was this book about? Why would you recommend it to a classmate?" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 font-semibold focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white font-extrabold py-4 rounded-xl shadow-lg shadow-green-500/20 transition duration-150 text-lg flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-paper-plane"></i> Submit Book Entry
+                    </button>
+                </form>
+            </div>
+        </section>
+
+        <!-- ==================== TEACHER PORTAL TAB ==================== -->
+        <section id="view-teacher" class="space-y-6 hidden">
+            <!-- Teacher Auth Shield -->
+            <div id="teacher-auth-card" class="max-w-md mx-auto bg-white rounded-2xl border border-slate-200 p-8 shadow-xl text-center">
+                <div class="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl font-black">
+                    <i class="fa-solid fa-shield-halved"></i>
+                </div>
+                <h2 class="text-2xl font-extrabold text-slate-800">Teacher Portal Authentication</h2>
+                <p class="text-xs text-slate-500 mt-1 mb-6">Enter passcode to review entries, grant badges, and manage rosters.</p>
+
+                <form onsubmit="handleTeacherAuth(event)" class="space-y-4">
+                    <input type="password" id="teacher-passcode-input" placeholder="Passcode (Default: TEACH2026)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-center text-lg font-mono focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-amber-500/20 transition">
+                        Unlock Teacher Dashboard
+                    </button>
+                </form>
+            </div>
+
+            <!-- Unlocked Teacher Dashboard -->
+            <div id="teacher-dashboard" class="hidden space-y-6">
+                <!-- Header Controls -->
+                <div class="bg-slate-900 text-white p-6 rounded-2xl flex flex-wrap items-center justify-between gap-4 shadow-lg">
+                    <div>
+                        <h2 class="text-xl font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-chalkboard-user text-amber-400"></i> Teacher Command Center
+                        </h2>
+                        <p class="text-xs text-slate-400">Review pending logs, issue awards, and manage student accounts.</p>
+                    </div>
+
+                    <div class="flex flex-wrap items-center gap-2">
+                        <button onclick="printStudentSlips()" class="bg-slate-800 hover:bg-slate-700 text-xs font-bold px-3 py-2 rounded-lg border border-slate-700 transition">
+                            <i class="fa-solid fa-print"></i> Print PIN Slips
+                        </button>
+                        <button onclick="exportDatabase()" class="bg-slate-800 hover:bg-slate-700 text-xs font-bold px-3 py-2 rounded-lg border border-slate-700 transition">
+                            <i class="fa-solid fa-download"></i> Backup Data (JSON)
+                        </button>
+                        <button onclick="lockTeacherPortal()" class="bg-red-500/20 text-red-300 hover:bg-red-500/30 text-xs font-bold px-3 py-2 rounded-lg border border-red-500/30 transition">
+                            <i class="fa-solid fa-lock"></i> Lock Portal
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Teacher Sub-tabs -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                    <!-- Moderate Submissions -->
+                    <div class="lg:col-span-2 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                                <i class="fa-solid fa-clipboard-check text-blue-600"></i> Moderate Student Submissions
+                            </h3>
+                            <span id="pending-count-badge" class="bg-amber-100 text-amber-800 text-xs font-extrabold px-2.5 py-1 rounded-full">0 Pending</span>
+                        </div>
+
+                        <div id="moderation-list" class="space-y-4">
+                            <!-- Injected dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Student Roster & PIN Manager -->
+                    <div class="space-y-6">
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-4">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-users text-indigo-600"></i> Add Student to Roster
+                            </h3>
+                            <form onsubmit="handleAddStudent(event)" class="space-y-3">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase">Core Class</label>
+                                    <select id="new-student-core" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold">
+                                        <option value="Core 1-ADV">Core 1-ADV</option>
+                                        <option value="Core 2-REG">Core 2-REG</option>
+                                        <option value="Core 3-REG">Core 3-REG</option>
+                                        <option value="Core 4-REG">Core 4-REG</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase">Full Student Name</label>
+                                    <input type="text" id="new-student-name" placeholder="e.g. Alex Morgan" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold">
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase">4-Digit PIN (Leave blank to auto-generate)</label>
+                                    <input type="text" id="new-student-pin" maxlength="4" placeholder="Auto" pattern="[0-9]{4}" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold font-mono">
+                                </div>
+                                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition">
+                                    + Add Student
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2 text-sm">
+                                <i class="fa-solid fa-id-card text-purple-600"></i> Student Roster & PIN Lookup
+                            </h3>
+                            <div class="max-h-60 overflow-y-auto divide-y divide-slate-100 text-xs" id="roster-lookup-list">
+                                <!-- Dynamic roster list -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- ==================== FIREBASE CONFIG MODAL ==================== -->
+    <div id="config-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-cloud-bolt text-blue-600"></i> Firebase Live Sync Setup
+                </h3>
+                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+            </div>
+
+            <p class="text-xs text-slate-600">
+                Paste your free Firebase Config snippet or JSON keys below to enable <strong>live cross-device synchronization</strong> across all student Chromebooks.
+            </p>
+
+            <form onsubmit="handleSaveFirebaseConfig(event)" class="space-y-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase">apiKey</label>
+                    <input type="text" id="fb-apiKey" required placeholder="AIzaSy..." class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase">authDomain</label>
+                        <input type="text" id="fb-authDomain" required placeholder="app.firebaseapp.com" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase">projectId</label>
+                        <input type="text" id="fb-projectId" required placeholder="my-app-id" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono">
+                    </div>
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                        Connect Live Database
+                    </button>
+                    <button type="button" onclick="clearFirebaseConfig()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-3 py-2.5 rounded-xl text-xs transition">
+                        Reset Config
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Printable Area Hidden in UI -->
+    <div id="printable-area" class="hidden">
+        <h1 class="text-2xl font-bold text-center mb-4">7th Grade Book Tracker - Student Login PIN Slips</h1>
+        <div id="printable-slips-grid" class="grid grid-cols-2 gap-4 p-4">
+            <!-- Dynamic Printable Slips -->
+        </div>
+    </div>
+
+    <script>
+        /* ==================== GLOBAL APP STATE ==================== */
+        const APP_STATE = {
+            firebaseConnected: false,
+            db: null,
+            currentUser: null, // { name, core, role: 'student'|'teacher' }
+            teacherPasscode: 'TEACH2026',
+            students: [],
+            books: [],
+            milestones: [
+                { id: 'm1', name: '25 Books Read', goal: 25, icon: 'fa-seedling' },
+                { id: 'm2', name: '50 Books Read', goal: 50, icon: 'fa-tree' },
+                { id: 'm3', name: '100 Books Read', goal: 100, icon: 'fa-trophy' },
+                { id: 'm4', name: '250 Century Club', goal: 250, icon: 'fa-crown' },
+            ]
+        };
+
+        // Default Initial Seed Students
+        const DEFAULT_STUDENTS = [
+            { id: 's1', name: 'Alex Morgan', core: 'Core 1-ADV', pin: '1234' },
+            { id: 's2', name: 'Jordan Lee', core: 'Core 1-ADV', pin: '5678' },
+            { id: 's3', name: 'Taylor Swift', core: 'Core 2-REG', pin: '1111' },
+            { id: 's4', name: 'Chris Evans', core: 'Core 3-REG', pin: '2222' },
+            { id: 's5', name: 'Maya Lin', core: 'Core 4-REG', pin: '3333' }
+        ];
+
+        /* ==================== INITIALIZATION & FIREBASE SETUP ==================== */
+        window.addEventListener('DOMContentLoaded', () => {
+            initFirebase();
+            loadInitialData();
+            updateUIState();
+        });
+
+        function initFirebase() {
+            const storedConfig = localStorage.getItem('fb_config');
+            if (storedConfig) {
+                try {
+                    const config = JSON.parse(storedConfig);
+                    if (!firebase.apps.length) {
+                        firebase.initializeApp(config);
+                    }
+                    APP_STATE.db = firebase.firestore();
+                    APP_STATE.firebaseConnected = true;
+
+                    document.getElementById('cloud-status-badge').className = "inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-200 px-2.5 py-0.5 rounded-full font-bold";
+                    document.getElementById('cloud-status-badge').innerHTML = '<i class="fa-solid fa-cloud text-[10px]"></i> Live Cloud Sync Active';
+                    document.getElementById('demo-mode-alert').classList.add('hidden');
+
+                    // Setup Live Firestore Snapshots
+                    setupFirestoreListeners();
+                } catch (e) {
+                    console.error("Firebase Config Error:", e);
+                    setDemoMode();
+                }
+            } else {
+                setDemoMode();
+            }
+        }
+
+        function setDemoMode() {
+            APP_STATE.firebaseConnected = false;
+            document.getElementById('cloud-status-badge').className = "inline-flex items-center gap-1 bg-amber-500/20 text-amber-200 px-2.5 py-0.5 rounded-full font-bold";
+            document.getElementById('cloud-status-badge').innerHTML = '<i class="fa-solid fa-hard-drive text-[10px]"></i> Demo Mode (Local Storage)';
+            document.getElementById('demo-mode-alert').classList.remove('hidden');
+        }
+
+        function setupFirestoreListeners() {
+            if (!APP_STATE.db) return;
+
+            // Real-time Books Listener
+            APP_STATE.db.collection('books').onSnapshot(snapshot => {
+                APP_STATE.books = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                renderAllViews();
+            });
+
+            // Real-time Students Listener
+            APP_STATE.db.collection('students').onSnapshot(snapshot => {
+                APP_STATE.students = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                updateStudentDropdown();
+                renderAllViews();
+            });
+        }
+
+        function loadInitialData() {
+            if (!APP_STATE.firebaseConnected) {
+                const localStudents = localStorage.getItem('bt_students');
+                APP_STATE.students = localStudents ? JSON.parse(localStudents) : DEFAULT_STUDENTS;
+
+                const localBooks = localStorage.getItem('bt_books');
+                APP_STATE.books = localBooks ? JSON.parse(localBooks) : [];
+
+                renderAllViews();
+            }
+        }
+
+        function saveLocalData() {
+            if (!APP_STATE.firebaseConnected) {
+                localStorage.setItem('bt_students', JSON.stringify(APP_STATE.students));
+                localStorage.setItem('bt_books', JSON.stringify(APP_STATE.books));
+                renderAllViews();
+            }
+        }
+
+        /* ==================== USER AUTHENTICATION & LOGIN ==================== */
+        function updateStudentDropdown() {
+            const coreSelect = document.getElementById('login-core').value;
+            const studentSelect = document.getElementById('login-student');
+
+            studentSelect.innerHTML = '<option value="">-- Choose Student --</option>';
+            if (!coreSelect) {
+                studentSelect.disabled = true;
+                return;
+            }
+
+            const filteredStudents = APP_STATE.students.filter(s => s.core === coreSelect);
+            filteredStudents.forEach(s => {
+                const opt = document.createElement('option');
+                opt.value = s.id;
+                opt.textContent = s.name;
+                studentSelect.appendChild(opt);
+            });
+            studentSelect.disabled = false;
+        }
+
+        function handleStudentLogin(e) {
+            e.preventDefault();
+            const studentId = document.getElementById('login-student').value;
+            const pinInput = document.getElementById('login-pin').value;
+
+            const student = APP_STATE.students.find(s => s.id === studentId);
+            if (student && student.pin === pinInput) {
+                APP_STATE.currentUser = { ...student, role: 'student' };
+                updateUIState();
+                switchTab('feed');
+                confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
+            } else {
+                alert('Invalid 4-Digit PIN. Please check with your teacher!');
+            }
+        }
+
+        function handleTeacherAuth(e) {
+            e.preventDefault();
+            const passcode = document.getElementById('teacher-passcode-input').value;
+            if (passcode === APP_STATE.teacherPasscode) {
+                document.getElementById('teacher-auth-card').classList.add('hidden');
+                document.getElementById('teacher-dashboard').classList.remove('hidden');
+                renderTeacherDashboard();
+            } else {
+                alert('Incorrect Passcode.');
+            }
+        }
+
+        function lockTeacherPortal() {
+            document.getElementById('teacher-auth-card').classList.remove('hidden');
+            document.getElementById('teacher-dashboard').classList.add('hidden');
+            document.getElementById('teacher-passcode-input').value = '';
+        }
+
+        function logout() {
+            APP_STATE.currentUser = null;
+            updateUIState();
+            switchTab('login');
+        }
+
+        function updateUIState() {
+            const userBadge = document.getElementById('user-badge');
+            const userDisplay = document.getElementById('user-display-name');
+
+            if (APP_STATE.currentUser) {
+                userBadge.classList.remove('hidden');
+                userDisplay.textContent = `${APP_STATE.currentUser.name} (${APP_STATE.currentUser.core})`;
+                document.getElementById('submit-author-name').textContent = APP_STATE.currentUser.name;
+                document.getElementById('submit-author-core').textContent = APP_STATE.currentUser.core;
+            } else {
+                userBadge.classList.add('hidden');
+            }
+        }
+
+        /* ==================== NAVIGATION CONTROLLER ==================== */
+        function switchTab(tabId) {
+            const tabs = ['login', 'feed', 'leaderboard', 'impact', 'submit', 'teacher'];
+            tabs.forEach(t => {
+                const el = document.getElementById(`view-${t}`);
+                if (el) el.classList.add('hidden');
+                const navBtn = document.getElementById(`tab-${t}`);
+                if (navBtn) navBtn.classList.remove('bg-white/20', 'text-white');
+            });
+
+            // Guard Submit Tab for Logged in students
+            if (tabId === 'submit' && !APP_STATE.currentUser) {
+                alert('Please sign in with your PIN first!');
+                tabId = 'login';
+            }
+
+            const activeView = document.getElementById(`view-${tabId}`);
+            if (activeView) activeView.classList.remove('hidden');
+
+            const activeBtn = document.getElementById(`tab-${tabId}`);
+            if (activeBtn) activeBtn.classList.add('bg-white/20', 'text-white');
+
+            renderAllViews();
+        }
+
+        /* ==================== DATA SUBMISSION & ACTIONS ==================== */
+        function handleBookSubmit(e) {
+            e.preventDefault();
+            if (!APP_STATE.currentUser) return;
+
+            const newBook = {
+                title: document.getElementById('book-title').value.trim(),
+                author: document.getElementById('book-author').value.trim(),
+                pages: parseInt(document.getElementById('book-pages').value),
+                genre: document.getElementById('book-genre').value,
+                rating: parseInt(document.getElementById('book-rating').value),
+                review: document.getElementById('book-review').value.trim(),
+                studentName: APP_STATE.currentUser.name,
+                studentId: APP_STATE.currentUser.id,
+                core: APP_STATE.currentUser.core,
+                timestamp: new Date().toISOString(),
+                verified: false,
+                pinned: false,
+                sticker: null
+            };
+
+            if (APP_STATE.firebaseConnected) {
+                APP_STATE.db.collection('books').add(newBook);
+            } else {
+                newBook.id = 'b_' + Date.now();
+                APP_STATE.books.unshift(newBook);
+                saveLocalData();
+            }
+
+            document.getElementById('book-entry-form').reset();
+            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+            alert('Book entry logged successfully!');
+            switchTab('feed');
+        }
+
+        function handleAddStudent(e) {
+            e.preventDefault();
+            const core = document.getElementById('new-student-core').value;
+            const name = document.getElementById('new-student-name').value.trim();
+            let pin = document.getElementById('new-student-pin').value.trim();
+
+            if (!pin) {
+                pin = Math.floor(1000 + Math.random() * 9000).toString();
+            }
+
+            const newStudent = { core, name, pin };
+
+            if (APP_STATE.firebaseConnected) {
+                APP_STATE.db.collection('students').add(newStudent);
+            } else {
+                newStudent.id = 's_' + Date.now();
+                APP_STATE.students.push(newStudent);
+                saveLocalData();
+            }
+
+            document.getElementById('new-student-name').value = '';
+            document.getElementById('new-student-pin').value = '';
+            alert(`Added ${name} with PIN: ${pin}`);
+            updateStudentDropdown();
+            renderTeacherDashboard();
+        }
+
+        /* ==================== VIEW RENDERERS ==================== */
+        function renderAllViews() {
+            renderHeroStats();
+            renderFeed();
+            renderLeaderboards();
+            renderImpact();
+            renderTeacherDashboard();
+        }
+
+        function renderHeroStats() {
+            const totalBooks = APP_STATE.books.length;
+            const totalPages = APP_STATE.books.reduce((sum, b) => sum + (b.pages || 0), 0);
+
+            document.getElementById('stat-grade-books').textContent = totalBooks;
+            document.getElementById('stat-grade-pages').textContent = totalPages.toLocaleString();
+
+            // Calculate Leading Core
+            const coreTotals = {};
+            APP_STATE.books.forEach(b => {
+                coreTotals[b.core] = (coreTotals[b.core] || 0) + 1;
+            });
+            let leadingCore = 'Core 1-ADV';
+            let maxCoreBooks = 0;
+            for (let c in coreTotals) {
+                if (coreTotals[c] > maxCoreBooks) {
+                    maxCoreBooks = coreTotals[c];
+                    leadingCore = c;
+                }
+            }
+            document.getElementById('stat-leading-core').textContent = leadingCore;
+
+            // Calculate Top Genre
+            const genreTotals = {};
+            APP_STATE.books.forEach(b => {
+                genreTotals[b.genre] = (genreTotals[b.genre] || 0) + 1;
+            });
+            let topGenre = 'Fiction';
+            let maxGenre = 0;
+            for (let g in genreTotals) {
+                if (genreTotals[g] > maxGenre) {
+                    maxGenre = genreTotals[g];
+                    topGenre = g;
+                }
+            }
+            document.getElementById('stat-top-genre').textContent = topGenre;
+        }
+
+        function renderFeed() {
+            const feedList = document.getElementById('feed-list');
+            const filterCore = document.getElementById('feed-filter-core').value;
+            const spotlightContainer = document.getElementById('spotlight-container');
+
+            let filtered = APP_STATE.books;
+            if (filterCore !== 'ALL') {
+                filtered = filtered.filter(b => b.core === filterCore);
+            }
+
+            // Render Teacher Spotlight Pick if existing
+            const pinnedBook = APP_STATE.books.find(b => b.pinned);
+            if (pinnedBook) {
+                spotlightContainer.classList.remove('hidden');
+                document.getElementById('spotlight-content').innerHTML = `
+                    <div class="text-3xl text-amber-500 pt-1"><i class="fa-solid fa-quote-left"></i></div>
+                    <div class="space-y-1 flex-1">
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-slate-800 text-lg">"${pinnedBook.title}" by ${pinnedBook.author}</h4>
+                            <span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">${pinnedBook.genre}</span>
+                        </div>
+                        <p class="text-sm text-slate-700 italic">"${pinnedBook.review}"</p>
+                        <div class="text-xs font-bold text-amber-800 pt-2 flex items-center gap-2">
+                            <span>Logged by ${pinnedBook.studentName} (${pinnedBook.core})</span>
+                            <span>•</span>
+                            <span>${'⭐'.repeat(pinnedBook.rating)}</span>
+                        </div>
+                    </div>
+                `;
+            } else {
+                spotlightContainer.classList.add('hidden');
+            }
+
+            if (filtered.length === 0) {
+                feedList.innerHTML = `<div class="bg-white rounded-2xl p-8 text-center text-slate-400 font-semibold border border-slate-200">No books logged yet! Be the first to log a book today.</div>`;
+                return;
+            }
+
+            feedList.innerHTML = filtered.map(b => `
+                <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3 relative hover:border-slate-300 transition">
+                    <div class="flex items-start justify-between gap-2">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <h3 class="font-extrabold text-slate-800 text-base">${b.title}</h3>
+                                ${b.verified ? '<span class="text-emerald-500 text-xs" title="Verified by Teacher"><i class="fa-solid fa-circle-check"></i></span>' : ''}
+                                ${b.sticker ? `<span class="bg-purple-100 text-purple-700 text-[10px] font-black px-2 py-0.5 rounded-full">${b.sticker}</span>` : ''}
+                            </div>
+                            <div class="text-xs text-slate-500 font-medium">by ${b.author} • <span class="text-slate-700 font-bold">${b.pages} pages</span></div>
+                        </div>
+                        <span class="bg-slate-100 text-slate-600 text-xs font-bold px-2.5 py-1 rounded-lg">${b.genre}</span>
+                    </div>
+
+                    <p class="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-100">"${b.review}"</p>
+
+                    <div class="flex items-center justify-between text-xs border-t border-slate-100 pt-3 text-slate-400 font-medium">
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-slate-700">${b.studentName}</span>
+                            <span class="bg-blue-50 text-blue-700 font-extrabold text-[10px] px-2 py-0.5 rounded">${b.core}</span>
+                        </div>
+                        <div>${'⭐'.repeat(b.rating)}</div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Render Milestones sidebar
+            const milestonesList = document.getElementById('milestone-list');
+            const totalGradeBooks = APP_STATE.books.length;
+            milestonesList.innerHTML = APP_STATE.milestones.map(m => {
+                const percent = Math.min(100, Math.round((totalGradeBooks / m.goal) * 100));
+                return `
+                    <div class="space-y-1">
+                        <div class="flex justify-between text-xs font-bold">
+                            <span class="text-slate-700"><i class="fa-solid ${m.icon} text-amber-500 mr-1"></i> ${m.name}</span>
+                            <span class="text-slate-500">${totalGradeBooks}/${m.goal}</span>
+                        </div>
+                        <div class="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
+                            <div class="bg-gradient-to-r from-amber-400 to-orange-500 h-full rounded-full transition-all duration-500" style="width: ${percent}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderLeaderboards() {
+            // Core Competition Cards
+            const cores = ['Core 1-ADV', 'Core 2-REG', 'Core 3-REG', 'Core 4-REG'];
+            const coreGrid = document.getElementById('core-leaderboard-grid');
+
+            const coreStats = cores.map(coreName => {
+                const books = APP_STATE.books.filter(b => b.core === coreName);
+                const totalPages = books.reduce((s, b) => s + (b.pages || 0), 0);
+                return { name: coreName, bookCount: books.length, pageCount: totalPages };
+            }).sort((a, b) => b.bookCount - a.bookCount);
+
+            coreGrid.innerHTML = coreStats.map((c, idx) => `
+                <div class="bg-white rounded-2xl border ${idx === 0 ? 'border-amber-300 ring-2 ring-amber-400/20' : 'border-slate-200'} p-5 shadow-sm relative overflow-hidden">
+                    ${idx === 0 ? '<div class="absolute top-2 right-2 text-amber-400 text-xl"><i class="fa-solid fa-crown"></i></div>' : ''}
+                    <div class="text-xs font-black text-slate-400 uppercase tracking-wider">Rank #${idx + 1}</div>
+                    <div class="text-xl font-extrabold text-slate-800 mt-1">${c.name}</div>
+
+                    <div class="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-slate-100 text-center">
+                        <div>
+                            <div class="text-2xl font-black text-blue-600">${c.bookCount}</div>
+                            <div class="text-[10px] font-bold text-slate-400 uppercase">Books</div>
+                        </div>
+                        <div>
+                            <div class="text-2xl font-black text-purple-600">${c.pageCount.toLocaleString()}</div>
+                            <div class="text-[10px] font-bold text-slate-400 uppercase">Pages</div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            // Student Table
+            const filterCore = document.getElementById('leaderboard-core-filter').value;
+            const tbody = document.getElementById('student-leaderboard-tbody');
+
+            // Aggregate Student Stats
+            const studentStats = APP_STATE.students.map(s => {
+                const sBooks = APP_STATE.books.filter(b => b.studentId === s.id || b.studentName === s.name);
+                const pages = sBooks.reduce((sum, b) => sum + (b.pages || 0), 0);
+                return { ...s, bookCount: sBooks.length, pageCount: pages };
+            });
+
+            let filteredStudents = studentStats;
+            if (filterCore !== 'ALL') {
+                filteredStudents = filteredStudents.filter(s => s.core === filterCore);
+            }
+
+            filteredStudents.sort((a, b) => b.bookCount - a.bookCount || b.pageCount - a.pageCount);
+
+            tbody.innerHTML = filteredStudents.map((s, idx) => {
+                let badge = '🥉 Reader';
+                if (s.bookCount >= 20) badge = '👑 Century Club';
+                else if (s.bookCount >= 10) badge = '🥇 Master Reader';
+                else if (s.bookCount >= 5) badge = '🥈 Star Reader';
+
+                return `
+                    <tr class="hover:bg-slate-50 transition">
+                        <td class="py-3 px-4 font-black text-slate-400">#${idx + 1}</td>
+                        <td class="py-3 px-4 text-slate-800 font-bold">${s.name}</td>
+                        <td class="py-3 px-4"><span class="bg-slate-100 text-slate-600 text-xs font-bold px-2 py-0.5 rounded">${s.core}</span></td>
+                        <td class="py-3 px-4 text-center text-blue-600 font-extrabold">${s.bookCount}</td>
+                        <td class="py-3 px-4 text-center text-purple-600 font-extrabold">${s.pageCount.toLocaleString()}</td>
+                        <td class="py-3 px-4 text-right"><span class="bg-amber-50 text-amber-700 text-xs font-bold px-2 py-1 rounded-lg border border-amber-200">${badge}</span></td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function renderImpact() {
+            const totalStudents = APP_STATE.students.length || 1;
+            const totalPages = APP_STATE.books.reduce((s, b) => s + (b.pages || 0), 0);
+            const verifiedCount = APP_STATE.books.filter(b => b.verified).length;
+            const stickersCount = APP_STATE.books.filter(b => b.sticker).length;
+
+            document.getElementById('impact-avg-pages').textContent = Math.round(totalPages / totalStudents).toLocaleString();
+            document.getElementById('impact-verified-rate').textContent = APP_STATE.books.length ? Math.round((verifiedCount / APP_STATE.books.length) * 100) + '%' : '0%';
+            document.getElementById('impact-stickers-count').textContent = stickersCount;
+
+            // Render Genre breakdown bars
+            const genres = ['Fiction', 'Non-Fiction', 'Fantasy', 'Sci-Fi', 'Graphic Novel', 'Mystery', 'Historical Fiction', 'Biography'];
+            const container = document.getElementById('genre-distribution-bars');
+            const maxVal = Math.max(1, APP_STATE.books.length);
+
+            container.innerHTML = genres.map(g => {
+                const count = APP_STATE.books.filter(b => b.genre === g).length;
+                const pct = Math.round((count / maxVal) * 100);
+                return `
+                    <div>
+                        <div class="flex justify-between text-xs font-bold text-slate-600 mb-1">
+                            <span>${g}</span>
+                            <span>${count} books (${pct}%)</span>
+                        </div>
+                        <div class="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+                            <div class="bg-blue-600 h-full rounded-full" style="width: ${pct}%"></div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function renderTeacherDashboard() {
+            const pendingList = document.getElementById('moderation-list');
+            const rosterList = document.getElementById('roster-lookup-list');
+
+            // Render Moderation Feed
+            const unverified = APP_STATE.books.filter(b => !b.verified);
+            document.getElementById('pending-count-badge').textContent = `${unverified.length} Pending`;
+
+            if (unverified.length === 0) {
+                pendingList.innerHTML = `<div class="bg-white rounded-2xl p-6 text-center text-slate-400 text-xs font-bold border border-slate-200">✨ All student book entries have been verified!</div>`;
+            } else {
+                pendingList.innerHTML = unverified.map(b => `
+                    <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h4 class="font-bold text-slate-800">${b.title} <span class="text-xs text-slate-400 font-normal">by ${b.author}</span></h4>
+                                <div class="text-xs text-slate-500">Student: <strong>${b.studentName}</strong> (${b.core}) • ${b.pages} pages</div>
+                            </div>
+                            <span class="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200">Pending Review</span>
+                        </div>
+                        <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg">"${b.review}"</p>
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
+                            <div class="flex items-center gap-1">
+                                <button onclick="awardSticker('${b.id}', '⭐ Star')" class="bg-slate-100 hover:bg-slate-200 text-[10px] font-bold px-2 py-1 rounded">⭐ Star</button>
+                                <button onclick="awardSticker('${b.id}', '🔥 Fire Reader')" class="bg-slate-100 hover:bg-slate-200 text-[10px] font-bold px-2 py-1 rounded">🔥 Fire</button>
+                                <button onclick="awardSticker('${b.id}', '🏆 Core Hero')" class="bg-slate-100 hover:bg-slate-200 text-[10px] font-bold px-2 py-1 rounded">🏆 Hero</button>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="toggleSpotlight('${b.id}')" class="text-xs text-amber-600 font-bold hover:underline"><i class="fa-solid fa-thumbtack"></i> Spotlight</button>
+                                <button onclick="verifyBook('${b.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">Verify & Approve</button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+
+            // Render Roster Lookup
+            rosterList.innerHTML = APP_STATE.students.map(s => `
+                <div class="py-2.5 flex items-center justify-between">
+                    <div>
+                        <div class="font-bold text-slate-800">${s.name}</div>
+                        <div class="text-[10px] text-slate-400">${s.core}</div>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <span class="bg-slate-100 text-slate-700 font-mono text-xs px-2 py-1 rounded border border-slate-200">PIN: ${s.pin}</span>
+                        <button onclick="deleteStudent('${s.id}')" class="text-red-400 hover:text-red-600 text-xs"><i class="fa-solid fa-trash"></i></button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        /* ==================== TEACHER MODERATION ACTIONS ==================== */
+        function verifyBook(bookId) {
+            if (APP_STATE.firebaseConnected) {
+                APP_STATE.db.collection('books').doc(bookId).update({ verified: true });
+            } else {
+                const b = APP_STATE.books.find(x => x.id === bookId);
+                if (b) b.verified = true;
+                saveLocalData();
+            }
+        }
+
+        function awardSticker(bookId, stickerLabel) {
+            if (APP_STATE.firebaseConnected) {
+                APP_STATE.db.collection('books').doc(bookId).update({ sticker: stickerLabel });
+            } else {
+                const b = APP_STATE.books.find(x => x.id === bookId);
+                if (b) b.sticker = stickerLabel;
+                saveLocalData();
+            }
+        }
+
+        function toggleSpotlight(bookId) {
+            APP_STATE.books.forEach(b => {
+                const isTarget = b.id === bookId;
+                if (APP_STATE.firebaseConnected) {
+                    APP_STATE.db.collection('books').doc(b.id).update({ pinned: isTarget });
+                } else {
+                    b.pinned = isTarget;
+                }
+            });
+            if (!APP_STATE.firebaseConnected) saveLocalData();
+        }
+
+        function deleteStudent(studentId) {
+            if (!confirm('Are you sure you want to delete this student account?')) return;
+            if (APP_STATE.firebaseConnected) {
+                APP_STATE.db.collection('students').doc(studentId).delete();
+            } else {
+                APP_STATE.students = APP_STATE.students.filter(s => s.id !== studentId);
+                saveLocalData();
+            }
+        }
+
+        function printStudentSlips() {
+            const grid = document.getElementById('printable-slips-grid');
+            grid.innerHTML = APP_STATE.students.map(s => `
+                <div class="border-2 border-dashed border-slate-400 p-4 rounded-xl text-center space-y-1">
+                    <div class="text-xs font-bold text-slate-500 uppercase">7th Grade Book Tracker</div>
+                    <div class="text-lg font-black text-slate-800">${s.name}</div>
+                    <div class="text-xs font-semibold text-blue-600">${s.core}</div>
+                    <div class="text-xs text-slate-400 pt-2">Your 4-Digit Login PIN:</div>
+                    <div class="text-2xl font-mono font-black text-slate-900 tracking-widest bg-slate-100 py-1 rounded-lg">${s.pin}</div>
+                </div>
+            `).join('');
+
+            document.getElementById('printable-area').classList.remove('hidden');
+            window.print();
+            document.getElementById('printable-area').classList.add('hidden');
+        }
+
+        function exportDatabase() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify({
+                students: APP_STATE.students,
+                books: APP_STATE.books
+            }, null, 2));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href", dataStr);
+            dlAnchorElem.setAttribute("download", `book_tracker_backup_${new Date().toISOString().slice(0,10)}.json`);
+            dlAnchorElem.click();
+        }
+
+        /* ==================== FIREBASE CONFIG MODAL ==================== */
+        function openConfigModal() {
+            const modal = document.getElementById('config-modal');
+            modal.classList.remove('hidden');
+
+            const stored = localStorage.getItem('fb_config');
+            if (stored) {
+                const config = JSON.parse(stored);
+                document.getElementById('fb-apiKey').value = config.apiKey || '';
+                document.getElementById('fb-authDomain').value = config.authDomain || '';
+                document.getElementById('fb-projectId').value = config.projectId || '';
+            }
+        }
+
+        function closeConfigModal() {
+            document.getElementById('config-modal').classList.add('hidden');
+        }
+
+        function handleSaveFirebaseConfig(e) {
+            e.preventDefault();
+            const config = {
+                apiKey: document.getElementById('fb-apiKey').value.trim(),
+                authDomain: document.getElementById('fb-authDomain').value.trim(),
+                projectId: document.getElementById('fb-projectId').value.trim(),
+            };
+
+            localStorage.setItem('fb_config', JSON.stringify(config));
+            closeConfigModal();
+            location.reload();
+        }
+
+        function clearFirebaseConfig() {
+            localStorage.removeItem('fb_config');
+            closeConfigModal();
+            location.reload();
+        }
+    </script>
+</body>
+</html>
