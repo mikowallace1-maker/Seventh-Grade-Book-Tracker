@@ -66,7 +66,9 @@
 
             <!-- Global Action Controls -->
             <div class="flex items-center gap-2">
-               
+                <button onclick="openConfigModal()" class="bg-white/10 hover:bg-white/20 text-white px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition">
+                    <i class="fa-solid fa-cloud-bolt"></i> <span class="hidden sm:inline">Firebase Sync</span>
+                </button>
                 <div id="user-badge" class="hidden bg-white/20 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2">
                     <i class="fa-solid fa-user-circle"></i> <span id="user-display-name">Student</span>
                     <button onclick="logout()" class="text-xs text-red-200 hover:text-white underline ml-1">Logout</button>
@@ -97,6 +99,20 @@
     </header>
 
     <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
+
+        <!-- Banner for setup notification if demo mode -->
+        <div id="demo-mode-alert" class="hidden mb-6 bg-amber-50 border border-amber-200 rounded-xl p-4 text-amber-800 flex items-center justify-between gap-4 shadow-sm">
+            <div class="flex items-center gap-3">
+                <i class="fa-solid fa-triangle-exclamation text-xl text-amber-600"></i>
+                <div class="text-sm">
+                    <strong>Demo Local Storage Mode Active:</strong> Books logged on this screen won't sync to other devices yet.
+                    <span class="hidden sm:inline">Connect a free Firebase Database to sync grade-wide across all student Chromebooks!</span>
+                </div>
+            </div>
+            <button onclick="openConfigModal()" class="bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold px-3 py-2 rounded-lg whitespace-nowrap transition">
+                Setup Live Cloud Sync
+            </button>
+        </div>
 
         <!-- ==================== LOGIN PORTAL TAB ==================== -->
         <section id="view-login" class="max-w-md mx-auto my-8 bg-white p-8 rounded-2xl shadow-xl border border-slate-100">
@@ -503,6 +519,47 @@
         </section>
     </main>
 
+    <!-- ==================== FIREBASE CONFIG MODAL ==================== -->
+    <div id="config-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+                <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
+                    <i class="fa-solid fa-cloud-bolt text-blue-600"></i> Firebase Live Sync Setup
+                </h3>
+                <button onclick="closeConfigModal()" class="text-slate-400 hover:text-slate-600 text-lg">&times;</button>
+            </div>
+
+            <p class="text-xs text-slate-600">
+                Paste your free Firebase Config snippet or JSON keys below to enable <strong>live cross-device synchronization</strong> across all student Chromebooks.
+            </p>
+
+            <form onsubmit="handleSaveFirebaseConfig(event)" class="space-y-3">
+                <div>
+                    <label class="block text-[10px] font-bold text-slate-500 uppercase">apiKey</label>
+                    <input type="text" id="fb-apiKey" required placeholder="AIzaSy..." class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono">
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase">authDomain</label>
+                        <input type="text" id="fb-authDomain" required placeholder="app.firebaseapp.com" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-bold text-slate-500 uppercase">projectId</label>
+                        <input type="text" id="fb-projectId" required placeholder="my-app-id" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono">
+                    </div>
+                </div>
+
+                <div class="flex gap-2 pt-2">
+                    <button type="submit" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs transition">
+                        Connect Live Database
+                    </button>
+                    <button type="button" onclick="clearFirebaseConfig()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-3 py-2.5 rounded-xl text-xs transition">
+                        Reset Config
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <!-- Printable Area Hidden in UI -->
     <div id="printable-area" class="hidden">
@@ -608,32 +665,31 @@
             updateUIState();
         });
 
-     // ADD THIS NEW FUNCTION:
-function initFirebase() {
-    const config = {
-        apiKey: "AIzaSyDQ8fA6v1uRQ7YN2TCt5RCNG8awUaRh8JA",
-        authDomain: "book-tracker-seventh.firebaseapp.com",
-        projectId: "book-tracker-seventh"
-    };
+        function initFirebase() {
+            const storedConfig = localStorage.getItem('fb_config');
+            if (storedConfig) {
+                try {
+                    const config = JSON.parse(storedConfig);
+                    if (!firebase.apps.length) {
+                        firebase.initializeApp(config);
+                    }
+                    APP_STATE.db = firebase.firestore();
+                    APP_STATE.firebaseConnected = true;
 
-    try {
-        if (!firebase.apps.length) {
-            firebase.initializeApp(config);
+                    document.getElementById('cloud-status-badge').className = "inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-200 px-2.5 py-0.5 rounded-full font-bold";
+                    document.getElementById('cloud-status-badge').innerHTML = '<i class="fa-solid fa-cloud text-[10px]"></i> Live Cloud Sync Active';
+                    document.getElementById('demo-mode-alert').classList.add('hidden');
+
+                    // Setup Live Firestore Snapshots
+                    setupFirestoreListeners();
+                } catch (e) {
+                    console.error("Firebase Config Error:", e);
+                    setDemoMode();
+                }
+            } else {
+                setDemoMode();
+            }
         }
-        APP_STATE.db = firebase.firestore();
-        APP_STATE.firebaseConnected = true;
-
-        document.getElementById('cloud-status-badge').className = "inline-flex items-center gap-1 bg-emerald-500/20 text-emerald-200 px-2.5 py-0.5 rounded-full font-bold";
-        document.getElementById('cloud-status-badge').innerHTML = '<i class="fa-solid fa-cloud text-[10px]"></i> Live Cloud Sync Active';
-        document.getElementById('demo-mode-alert').classList.add('hidden');
-
-        // Setup Live Firestore Snapshots
-        setupFirestoreListeners();
-    } catch (e) {
-        console.error("Firebase Config Error:", e);
-        setDemoMode();
-    }
-}
 
         function setDemoMode() {
             APP_STATE.firebaseConnected = false;
@@ -1286,7 +1342,42 @@ function initFirebase() {
             dlAnchorElem.click();
         }
 
+        /* ==================== FIREBASE CONFIG MODAL ==================== */
+        function openConfigModal() {
+            const modal = document.getElementById('config-modal');
+            modal.classList.remove('hidden');
 
+            const stored = localStorage.getItem('fb_config');
+            if (stored) {
+                const config = JSON.parse(stored);
+                document.getElementById('fb-apiKey').value = config.apiKey || 'AIzaSyDQ8fA6v1uRQ7YN2TCt5RCNG8awUaRh8JA';
+                document.getElementById('fb-authDomain').value = config.authDomain || 'book-tracker-seventh.firebaseapp.com';
+                document.getElementById('fb-projectId').value = config.projectId || 'book-tracker-seventh';
+            }
+        }
+
+        function closeConfigModal() {
+            document.getElementById('config-modal').classList.add('hidden');
+        }
+
+        function handleSaveFirebaseConfig(e) {
+            e.preventDefault();
+            const config = {
+                apiKey: document.getElementById('fb-apiKey').value.trim(),
+                authDomain: document.getElementById('fb-authDomain').value.trim(),
+                projectId: document.getElementById('fb-projectId').value.trim(),
+            };
+
+            localStorage.setItem('fb_config', JSON.stringify(config));
+            closeConfigModal();
+            location.reload();
+        }
+
+        function clearFirebaseConfig() {
+            localStorage.removeItem('fb_config');
+            closeConfigModal();
+            location.reload();
+        }
     </script>
 </body>
 </html>
