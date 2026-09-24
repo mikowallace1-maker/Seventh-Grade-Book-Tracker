@@ -97,6 +97,7 @@
             </div>
         </nav>
     </header>
+
     <main class="max-w-7xl mx-auto px-4 py-6 flex-1 w-full">
 
         <!-- Banner for setup notification if demo mode -->
@@ -191,6 +192,7 @@
                     <!-- Dynamic Spotlight content injected here -->
                 </div>
             </div>
+
             <!-- Main Feed Layout -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <!-- Book Activity Stream -->
@@ -285,6 +287,7 @@
                 </div>
             </div>
         </section>
+
         <!-- ==================== GRADE IMPACT TAB ==================== -->
         <section id="view-impact" class="space-y-6 hidden">
             <div class="bg-white rounded-2xl border border-slate-200 p-6 shadow-sm">
@@ -381,6 +384,7 @@
                 </form>
             </div>
         </section>
+
         <!-- ==================== TEACHER PORTAL TAB ==================== -->
         <section id="view-teacher" class="space-y-6 hidden">
             <!-- Teacher Auth Shield -->
@@ -482,6 +486,7 @@
             </div>
         </section>
     </main>
+
     <!-- ==================== FIREBASE CONFIG MODAL ==================== -->
     <div id="config-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
         <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
@@ -590,6 +595,7 @@
                 setDemoMode();
             }
         }
+
         function setDemoMode() {
             APP_STATE.firebaseConnected = false;
             document.getElementById('cloud-status-badge').className = "inline-flex items-center gap-1 bg-amber-500/20 text-amber-200 px-2.5 py-0.5 rounded-full font-bold";
@@ -694,6 +700,7 @@
             updateUIState();
             switchTab('login');
         }
+
         function updateUIState() {
             const userBadge = document.getElementById('user-badge');
             const userDisplay = document.getElementById('user-display-name');
@@ -794,6 +801,7 @@
             updateStudentDropdown();
             renderTeacherDashboard();
         }
+
         /* ==================== VIEW RENDERERS ==================== */
         function renderAllViews() {
             renderHeroStats();
@@ -904,6 +912,7 @@
                     </div>
                 </div>
             `).join('');
+
             // Render Milestones sidebar
             const milestonesList = document.getElementById('milestone-list');
             const totalGradeBooks = APP_STATE.books.length;
@@ -989,6 +998,7 @@
                 `;
             }).join('');
         }
+
         function renderImpact() {
             const totalStudents = APP_STATE.students.length || 1;
             const totalPages = APP_STATE.books.reduce((s, b) => s + (b.pages || 0), 0);
@@ -1082,6 +1092,7 @@
                 saveLocalData();
             }
         }
+
         function awardSticker(bookId, stickerLabel) {
             if (APP_STATE.firebaseConnected) {
                 APP_STATE.db.collection('books').doc(bookId).update({ sticker: stickerLabel });
