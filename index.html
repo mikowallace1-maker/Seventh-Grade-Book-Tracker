@@ -396,7 +396,7 @@
                 <p class="text-xs text-slate-500 mt-1 mb-6">Enter passcode to review entries, grant badges, and manage rosters.</p>
 
                 <form onsubmit="handleTeacherAuth(event)" class="space-y-4">
-                    <input type="password" id="teacher-passcode-input" placeholder="Passcode (Default: TEACH2026)" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-center text-lg font-mono focus:outline-none focus:ring-2 focus:ring-amber-500">
+                    <input type="password" id="teacher-passcode-input" placeholder="Passcode" class="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 text-center text-lg font-mono focus:outline-none focus:ring-2 focus:ring-amber-500">
                     <button type="submit" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-amber-500/20 transition">
                         Unlock Teacher Dashboard
                     </button>
@@ -431,11 +431,18 @@
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <!-- Moderate Submissions -->
                     <div class="lg:col-span-2 space-y-4">
-                        <div class="flex items-center justify-between">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
                             <h3 class="font-bold text-slate-800 text-lg flex items-center gap-2">
-                                <i class="fa-solid fa-clipboard-check text-blue-600"></i> Moderate Student Submissions
+                                <i class="fa-solid fa-clipboard-check text-blue-600"></i> Manage Logged Books
                             </h3>
-                            <span id="pending-count-badge" class="bg-amber-100 text-amber-800 text-xs font-extrabold px-2.5 py-1 rounded-full">0 Pending</span>
+                            <div class="flex items-center gap-2">
+                                <select id="moderation-filter" onchange="renderTeacherDashboard()" class="bg-white border border-slate-200 text-xs font-bold rounded-lg px-2 py-1.5 focus:outline-none">
+                                    <option value="ALL">All Books</option>
+                                    <option value="PENDING">Pending Only</option>
+                                    <option value="VERIFIED">Verified Only</option>
+                                </select>
+                                <span id="pending-count-badge" class="bg-amber-100 text-amber-800 text-xs font-extrabold px-2.5 py-1 rounded-full whitespace-nowrap">0 Pending</span>
+                            </div>
                         </div>
 
                         <div id="moderation-list" class="space-y-4">
@@ -469,6 +476,31 @@
                                 </div>
                                 <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg text-xs transition">
                                     + Add Student
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm space-y-3">
+                            <h3 class="font-bold text-slate-800 flex items-center gap-2">
+                                <i class="fa-solid fa-file-import text-teal-600"></i> Mass Upload Students
+                            </h3>
+                            <p class="text-[10px] text-slate-500 -mt-2">Paste a class roster, one name per line. Optionally add a comma + 4-digit PIN (e.g. <span class="font-mono">Alex Morgan, 4821</span>) — otherwise a PIN is auto-generated.</p>
+                            <form onsubmit="handleBulkAddStudents(event)" class="space-y-3">
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase">Core Class for This Batch</label>
+                                    <select id="bulk-student-core" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-semibold">
+                                        <option value="Core 1-ADV">Core 1-ADV</option>
+                                        <option value="Core 2-REG">Core 2-REG</option>
+                                        <option value="Core 3-REG">Core 3-REG</option>
+                                        <option value="Core 4-REG">Core 4-REG</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-[10px] font-bold text-slate-500 uppercase">Paste Names</label>
+                                    <textarea id="bulk-student-names" rows="5" placeholder="Alex Morgan&#10;Jamie Rivera, 7734&#10;Sam Patel" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2 text-xs font-mono resize-y"></textarea>
+                                </div>
+                                <button type="submit" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2.5 rounded-lg text-xs transition">
+                                    <i class="fa-solid fa-upload"></i> Add All Students
                                 </button>
                             </form>
                         </div>
@@ -537,13 +569,76 @@
         </div>
     </div>
 
+    <!-- ==================== CUSTOM ALERT / CONFIRM POPUP ==================== -->
+    <div id="app-popup-overlay" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4 animate-[fadeIn_0.15s_ease-out]">
+            <div id="app-popup-icon" class="w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-2xl">
+                <i class="fa-solid fa-circle-info"></i>
+            </div>
+            <div>
+                <h3 id="app-popup-title" class="font-extrabold text-slate-800 text-lg"></h3>
+                <p id="app-popup-message" class="text-sm text-slate-500 mt-1 whitespace-pre-line"></p>
+            </div>
+            <div id="app-popup-buttons" class="flex gap-2 pt-1">
+                <button id="app-popup-cancel-btn" onclick="closeAppPopup(false)" class="hidden flex-1 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold py-2.5 rounded-xl text-sm transition">Cancel</button>
+                <button id="app-popup-ok-btn" onclick="closeAppPopup(true)" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-sm transition">OK</button>
+            </div>
+        </div>
+    </div>
+
     <script>
+        /* ==================== CUSTOM ALERT / CONFIRM POPUP ==================== */
+        // Replaces native window.alert()/window.confirm() with an in-app styled modal.
+        let _popupResolve = null;
+
+        const POPUP_STYLES = {
+            info:    { icon: 'fa-circle-info',        classes: 'bg-blue-100 text-blue-600' },
+            success: { icon: 'fa-circle-check',       classes: 'bg-emerald-100 text-emerald-600' },
+            warning: { icon: 'fa-triangle-exclamation',classes: 'bg-amber-100 text-amber-600' },
+            danger:  { icon: 'fa-trash',               classes: 'bg-red-100 text-red-600' }
+        };
+
+        function showAppPopup({ title = 'Notice', message = '', type = 'info', showCancel = false, okLabel = 'OK', cancelLabel = 'Cancel' } = {}) {
+            const style = POPUP_STYLES[type] || POPUP_STYLES.info;
+            document.getElementById('app-popup-icon').className = `w-14 h-14 mx-auto rounded-2xl flex items-center justify-center text-2xl ${style.classes}`;
+            document.getElementById('app-popup-icon').innerHTML = `<i class="fa-solid ${style.icon}"></i>`;
+            document.getElementById('app-popup-title').textContent = title;
+            document.getElementById('app-popup-message').textContent = message;
+
+            const cancelBtn = document.getElementById('app-popup-cancel-btn');
+            const okBtn = document.getElementById('app-popup-ok-btn');
+            cancelBtn.classList.toggle('hidden', !showCancel);
+            cancelBtn.textContent = cancelLabel;
+            okBtn.textContent = okLabel;
+            okBtn.className = `flex-1 text-white font-bold py-2.5 rounded-xl text-sm transition ${type === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`;
+
+            document.getElementById('app-popup-overlay').classList.remove('hidden');
+
+            return new Promise(resolve => { _popupResolve = resolve; });
+        }
+
+        function closeAppPopup(result) {
+            document.getElementById('app-popup-overlay').classList.add('hidden');
+            if (_popupResolve) { _popupResolve(result); _popupResolve = null; }
+        }
+
+        // Drop-in alert replacement (fire-and-forget popup instead of the browser's alert())
+        function appAlert(message, type = 'info', title) {
+            const titles = { info: 'Notice', success: 'Success!', warning: 'Heads Up', danger: 'Error' };
+            return showAppPopup({ title: title || titles[type] || 'Notice', message, type, showCancel: false, okLabel: 'Got it' });
+        }
+
+        // Drop-in confirm replacement — returns a Promise<boolean>, so callers must be async/then-based
+        function appConfirm(message, title = 'Please Confirm') {
+            return showAppPopup({ title, message, type: 'danger', showCancel: true, okLabel: 'Yes, Continue', cancelLabel: 'Cancel' });
+        }
+
         /* ==================== GLOBAL APP STATE ==================== */
         const APP_STATE = {
             firebaseConnected: false,
             db: null,
             currentUser: null, // { name, core, role: 'student'|'teacher' }
-            teacherPasscode: 'TEACH2026',
+            teacherPasscode: '07080901',
             students: [],
             books: [],
             milestones: [
@@ -673,7 +768,7 @@
                 switchTab('feed');
                 confetti({ particleCount: 50, spread: 60, origin: { y: 0.7 } });
             } else {
-                alert('Invalid 4-Digit PIN. Please check with your teacher!');
+                appAlert('Invalid 4-Digit PIN. Please check with your teacher!', 'danger', 'Login Failed');
             }
         }
 
@@ -685,7 +780,7 @@
                 document.getElementById('teacher-dashboard').classList.remove('hidden');
                 renderTeacherDashboard();
             } else {
-                alert('Incorrect Passcode.');
+                appAlert('Incorrect Passcode.', 'danger', 'Access Denied');
             }
         }
 
@@ -727,7 +822,7 @@
 
             // Guard Submit Tab for Logged in students
             if (tabId === 'submit' && !APP_STATE.currentUser) {
-                alert('Please sign in with your PIN first!');
+                appAlert('Please sign in with your PIN first!', 'warning', 'Sign In Required');
                 tabId = 'login';
             }
 
@@ -771,7 +866,7 @@
 
             document.getElementById('book-entry-form').reset();
             confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-            alert('Book entry logged successfully!');
+            appAlert('Book entry logged successfully!', 'success');
             switchTab('feed');
         }
 
@@ -797,9 +892,75 @@
 
             document.getElementById('new-student-name').value = '';
             document.getElementById('new-student-pin').value = '';
-            alert(`Added ${name} with PIN: ${pin}`);
+            appAlert(`Added ${name} with PIN: ${pin}`, 'success');
             updateStudentDropdown();
             renderTeacherDashboard();
+        }
+
+        /* ==================== MASS UPLOAD (BULK ADD) STUDENTS ==================== */
+        function handleBulkAddStudents(e) {
+            e.preventDefault();
+            const core = document.getElementById('bulk-student-core').value;
+            const rawText = document.getElementById('bulk-student-names').value;
+
+            // Split pasted text into non-empty lines (handles names copied from spreadsheets or docs)
+            const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+            if (lines.length === 0) {
+                appAlert('Please paste at least one student name first.', 'warning', 'Nothing to Upload');
+                return;
+            }
+
+            const existingPins = new Set(APP_STATE.students.map(s => s.pin));
+            const newStudents = [];
+            const skipped = [];
+
+            lines.forEach(line => {
+                // Support "Name, PIN" or "Name\tPIN" on the same line; otherwise just a bare name
+                const parts = line.split(',');
+                let name = parts[0].trim();
+                let pin = parts.length > 1 ? parts[1].trim() : '';
+
+                if (!name) return;
+
+                // Generate a unique 4-digit PIN if one wasn't supplied or it's invalid/duplicate
+                if (!/^[0-9]{4}$/.test(pin) || existingPins.has(pin)) {
+                    if (pin && !/^[0-9]{4}$/.test(pin)) skipped.push(`${name} (invalid PIN "${pin}", auto-generated instead)`);
+                    do {
+                        pin = Math.floor(1000 + Math.random() * 9000).toString();
+                    } while (existingPins.has(pin));
+                }
+                existingPins.add(pin);
+                newStudents.push({ core, name, pin });
+            });
+
+            if (newStudents.length === 0) {
+                appAlert('No valid names were found in the pasted text.', 'warning', 'Nothing to Upload');
+                return;
+            }
+
+            if (APP_STATE.firebaseConnected) {
+                const batch = APP_STATE.db.batch();
+                newStudents.forEach(s => {
+                    const ref = APP_STATE.db.collection('students').doc();
+                    batch.set(ref, s);
+                });
+                batch.commit();
+            } else {
+                newStudents.forEach((s, i) => {
+                    s.id = 's_' + Date.now() + '_' + i;
+                    APP_STATE.students.push(s);
+                });
+                saveLocalData();
+            }
+
+            document.getElementById('bulk-student-names').value = '';
+            updateStudentDropdown();
+            renderTeacherDashboard();
+
+            let summary = `Added ${newStudents.length} student${newStudents.length === 1 ? '' : 's'} to ${core}.`;
+            if (skipped.length > 0) summary += `\n\nNote: ${skipped.length} name(s) had an invalid PIN and got an auto-generated one instead.`;
+            appAlert(summary, 'success', 'Mass Upload Complete');
         }
 
         /* ==================== VIEW RENDERERS ==================== */
@@ -1035,21 +1196,31 @@
             const pendingList = document.getElementById('moderation-list');
             const rosterList = document.getElementById('roster-lookup-list');
 
-            // Render Moderation Feed
+            // Render Moderation Feed (ALL logged books, newest first, so teachers can also delete already-verified entries)
             const unverified = APP_STATE.books.filter(b => !b.verified);
             document.getElementById('pending-count-badge').textContent = `${unverified.length} Pending`;
 
-            if (unverified.length === 0) {
-                pendingList.innerHTML = `<div class="bg-white rounded-2xl p-6 text-center text-slate-400 text-xs font-bold border border-slate-200">✨ All student book entries have been verified!</div>`;
+            const filterVal = document.getElementById('moderation-filter') ? document.getElementById('moderation-filter').value : 'ALL';
+            let visibleBooks = APP_STATE.books;
+            if (filterVal === 'PENDING') visibleBooks = APP_STATE.books.filter(b => !b.verified);
+            if (filterVal === 'VERIFIED') visibleBooks = APP_STATE.books.filter(b => b.verified);
+
+            if (visibleBooks.length === 0) {
+                pendingList.innerHTML = `<div class="bg-white rounded-2xl p-6 text-center text-slate-400 text-xs font-bold border border-slate-200">✨ No logged books to show here!</div>`;
             } else {
-                pendingList.innerHTML = unverified.map(b => `
+                pendingList.innerHTML = visibleBooks.map(b => `
                     <div class="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm space-y-3">
-                        <div class="flex justify-between items-start">
+                        <div class="flex justify-between items-start gap-2">
                             <div>
                                 <h4 class="font-bold text-slate-800">${b.title} <span class="text-xs text-slate-400 font-normal">by ${b.author}</span></h4>
                                 <div class="text-xs text-slate-500">Student: <strong>${b.studentName}</strong> (${b.core}) • ${b.pages} pages</div>
                             </div>
-                            <span class="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200">Pending Review</span>
+                            <div class="flex items-center gap-2 shrink-0">
+                                ${b.verified
+                                    ? `<span class="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-200 whitespace-nowrap">Verified</span>`
+                                    : `<span class="bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded border border-amber-200 whitespace-nowrap">Pending Review</span>`}
+                                <button onclick="deleteBook('${b.id}')" title="Delete this book entry" class="text-red-400 hover:text-red-600 text-xs px-1"><i class="fa-solid fa-trash"></i></button>
+                            </div>
                         </div>
                         <p class="text-xs text-slate-600 bg-slate-50 p-2.5 rounded-lg">"${b.review}"</p>
                         <div class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
@@ -1060,7 +1231,7 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <button onclick="toggleSpotlight('${b.id}')" class="text-xs text-amber-600 font-bold hover:underline"><i class="fa-solid fa-thumbtack"></i> Spotlight</button>
-                                <button onclick="verifyBook('${b.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">Verify & Approve</button>
+                                ${!b.verified ? `<button onclick="verifyBook('${b.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition">Verify & Approve</button>` : ''}
                             </div>
                         </div>
                     </div>
@@ -1115,14 +1286,32 @@
             if (!APP_STATE.firebaseConnected) saveLocalData();
         }
 
-        function deleteStudent(studentId) {
-            if (!confirm('Are you sure you want to delete this student account?')) return;
+        async function deleteStudent(studentId) {
+            const ok = await appConfirm('Are you sure you want to delete this student account? This cannot be undone.', 'Delete Student?');
+            if (!ok) return;
             if (APP_STATE.firebaseConnected) {
                 APP_STATE.db.collection('students').doc(studentId).delete();
             } else {
                 APP_STATE.students = APP_STATE.students.filter(s => s.id !== studentId);
                 saveLocalData();
             }
+            appAlert('Student account deleted.', 'success');
+        }
+
+        /* ==================== DELETE LOGGED BOOK ==================== */
+        async function deleteBook(bookId) {
+            const book = APP_STATE.books.find(b => b.id === bookId);
+            const label = book ? `"${book.title}" by ${book.studentName}` : 'this book entry';
+            const ok = await appConfirm(`Are you sure you want to delete ${label}? This cannot be undone.`, 'Delete Book Entry?');
+            if (!ok) return;
+
+            if (APP_STATE.firebaseConnected) {
+                APP_STATE.db.collection('books').doc(bookId).delete();
+            } else {
+                APP_STATE.books = APP_STATE.books.filter(b => b.id !== bookId);
+                saveLocalData();
+            }
+            appAlert('Book entry deleted.', 'success');
         }
 
         function printStudentSlips() {
@@ -1161,9 +1350,9 @@
             const stored = localStorage.getItem('fb_config');
             if (stored) {
                 const config = JSON.parse(stored);
-                document.getElementById('fb-apiKey').value = config.apiKey || '';
-                document.getElementById('fb-authDomain').value = config.authDomain || '';
-                document.getElementById('fb-projectId').value = config.projectId || '';
+                document.getElementById('fb-apiKey').value = config.apiKey || 'AIzaSyDQ8fA6v1uRQ7YN2TCt5RCNG8awUaRh8JA';
+                document.getElementById('fb-authDomain').value = config.authDomain || 'book-tracker-seventh.firebaseapp.com';
+                document.getElementById('fb-projectId').value = config.projectId || 'book-tracker-seventh';
             }
         }
 
